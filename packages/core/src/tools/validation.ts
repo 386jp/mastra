@@ -2,7 +2,7 @@ import type { RequestContext } from '../request-context';
 import { getRequestContextInputValues } from '../request-context/input-source';
 import { isStandardSchemaWithJSON, toStandardSchema, standardSchemaToJSONSchema } from '../schema';
 import type { PublicSchema, StandardSchemaWithJSON, StandardSchemaIssue } from '../schema';
-import { getZodTypeName, isZodArray, isZodObject, unwrapZodType } from '../utils/zod-utils';
+import { getZodTypeName, isZodArray, isZodObject, isZodRecord, unwrapZodType } from '../utils/zod-utils';
 
 const TOOL_OUTPUT_VALIDATION_SCHEMA: unique symbol = Symbol.for('mastra.tool.outputValidationSchema');
 
@@ -406,7 +406,7 @@ function getValueAtPath(obj: unknown, pathSegments: ReadonlyArray<PropertyKey | 
 
 /**
  * Coerces stringified JSON values in object properties when the schema expects
- * an array or object but the LLM returned a JSON string.
+ * an array, object, or record but the LLM returned a JSON string.
  *
  * Some LLMs (e.g., GLM4.7) return stringified JSON for array/object parameters:
  *   { "args": "[\"parse_excel.py\"]" }
@@ -460,16 +460,11 @@ function coerceStringifiedJsonValues(schema: StandardSchemaWithJSON<unknown>, in
     }
 
     const trimmed = value.trim();
-    if (
-      (isZodArray(baseFieldSchema) && trimmed.startsWith('[')) ||
-      (isZodObject(baseFieldSchema) && trimmed.startsWith('{'))
-    ) {
+    const expectsObject = isZodObject(baseFieldSchema) || isZodRecord(baseFieldSchema);
+    if ((isZodArray(baseFieldSchema) && trimmed.startsWith('[')) || (expectsObject && trimmed.startsWith('{'))) {
       try {
         const parsed = JSON.parse(value);
-        if (
-          (isZodArray(baseFieldSchema) && Array.isArray(parsed)) ||
-          (isZodObject(baseFieldSchema) && isPlainObject(parsed))
-        ) {
+        if ((isZodArray(baseFieldSchema) && Array.isArray(parsed)) || (expectsObject && isPlainObject(parsed))) {
           result[key] = parsed;
           changed = true;
         }

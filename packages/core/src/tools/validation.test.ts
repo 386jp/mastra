@@ -2211,6 +2211,64 @@ describe('validateToolInput - Stringified JSON Coercion (GitHub #12757)', () => 
     });
   });
 
+  // Some models (e.g. Claude Haiku) send a stringified JSON object for a z.record() parameter,
+  // such as a map of field codes to values when updating a record.
+  it('should coerce a stringified JSON object for a record parameter', () => {
+    const schema = z.object({
+      recordId: z.string(),
+      fields: z.record(z.string(), z.object({ value: z.unknown() })),
+    });
+
+    const input = {
+      recordId: '10',
+      fields: '{"title":{"value":"line 1\\nline 2\\n"}}',
+    };
+
+    const result = validateToolInput(schema, input);
+
+    expect(result.error).toBeUndefined();
+    expect(result.data).toEqual({
+      recordId: '10',
+      fields: { title: { value: 'line 1\nline 2\n' } },
+    });
+  });
+
+  it('should NOT coerce a stringified JSON array for a record parameter', () => {
+    const schema = z.object({
+      fields: z.record(z.string(), z.object({ value: z.unknown() })),
+    });
+
+    const result = validateToolInput(schema, { fields: '[{"value":"x"}]' });
+
+    expect(result.error).toBeDefined();
+    expect(result.error?.message).toContain('fields');
+  });
+
+  it('should work end-to-end with createTool when LLM sends a stringified record', async () => {
+    const tool = createTool({
+      id: 'update-record',
+      description: 'Update the fields of a record',
+      inputSchema: z.object({
+        recordId: z.string(),
+        fields: z.record(z.string(), z.object({ value: z.unknown() })),
+      }),
+      execute: async ({ recordId, fields }) => {
+        return { recordId, fields };
+      },
+    });
+
+    const result = await tool.execute({
+      recordId: '10',
+      fields: '{"title":{"value":"x"},"tags":{"value":["a","b"]}}' as any,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result).toEqual({
+      recordId: '10',
+      fields: { title: { value: 'x' }, tags: { value: ['a', 'b'] } },
+    });
+  });
+
   it('should NOT coerce regular strings that are not valid JSON', () => {
     const schema = z.object({
       name: z.string(),

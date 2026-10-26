@@ -3,6 +3,7 @@ import type { z } from 'zod/v4';
 type ZodTypeAny = z.ZodType<any, any>;
 type ZodObjectAny = z.ZodObject<any>;
 type ZodArrayAny = z.ZodArray<any>;
+type ZodRecordAny = z.ZodRecord<any, any>;
 
 /**
  * Checks if a value is a Zod type
@@ -71,6 +72,16 @@ export function isZodArray(value: unknown): value is ZodArrayAny {
 export function isZodObject(value: unknown): value is ZodObjectAny {
   if (!isZodType(value)) return false;
   return getZodTypeName(value) === 'ZodObject';
+}
+
+/**
+ * Check if a value is a ZodRecord type
+ * @param value - The value to check (can be any type)
+ * @returns True if the value is a ZodRecord
+ */
+export function isZodRecord(value: unknown): value is ZodRecordAny {
+  if (!isZodType(value)) return false;
+  return getZodTypeName(value) === 'ZodRecord';
 }
 
 /**
